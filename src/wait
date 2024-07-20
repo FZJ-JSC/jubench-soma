@@ -1,0 +1,83 @@
+#!/bin/bash
+set -euo pipefail
+
+#-------------------------------------------------------------------------------
+# Determining This Script's Parent Directory
+#-------------------------------------------------------------------------------
+SOURCE="${BASH_SOURCE[0]}"
+# resolve $SOURCE until the file is no longer a symlink
+while [ -h "$SOURCE" ]; do
+  DIR="$( cd -P "$( dirname "$SOURCE" )" >/dev/null 2>&1 && pwd )"
+  SOURCE="$(readlink "$SOURCE")"
+  # if $SOURCE was a relative symlink, we need to resolve it relative to the
+  # path where the symlink file was located
+  [[ $SOURCE != /* ]] && SOURCE="$DIR/$SOURCE"
+done
+SCRIPT_DIRECTORY="$( cd -P "$( dirname "$SOURCE" )" >/dev/null 2>&1 && pwd )"
+
+SHARE_DIRECTORY=$SCRIPT_DIRECTORY/../share
+
+#-------------------------------------------------------------------------------
+# Help Function
+#-------------------------------------------------------------------------------
+wait_help()
+{
+  echo "Usage:"
+  printf "  %-30s %-30s\n"  "wait --help" "Display this help"
+  printf "  %-30s %-30s\n"  "wait <args>" "Wait for job to finish"
+
+  echo ""
+  echo "Arguments:"
+  printf "  %-40s %-30s\n"  "--jobid <jobid>" "Job ID"
+}
+
+#-------------------------------------------------------------------------------
+# Parsing Command Line Options
+#-------------------------------------------------------------------------------
+if [[ $# -eq 0 ]]; then
+  wait_help
+  exit 1
+fi
+
+JOBID_SPECIFIED="false"
+
+while [[ $# -gt 0 ]]; do
+  KEY=$1
+  case $KEY in
+    -h|--help)
+      wait_help
+      exit 0
+      ;;
+    --jobid)
+      shift
+      if [[ $# -eq 0 ]]; then
+        break
+      fi
+      JOBID=$1
+      JOBID_SPECIFIED="true"
+      shift
+      ;;
+    *)
+      echo "Unrecognized Option $KEY"
+      wait_help
+      exit 1
+  esac
+done
+
+RUNNING="true"
+
+while [[ $RUNNING = "true" ]]; do
+  STATUS=$(sacct -j $JOBID --format=state%-30 -X | tail -n 1 | tr -d "[:blank:]" | tr -d '\n')
+  echo "Status = $STATUS"
+  if [[ $STATUS == "FAILED" ]]; then
+    RUNNING="false"
+    exit 1
+  elif [[ $STATUS == "COMPLETED" ]]; then
+    RUNNING="false"
+    exit 0
+  else
+    echo "Still Running"
+    sleep 10
+  fi
+done
+

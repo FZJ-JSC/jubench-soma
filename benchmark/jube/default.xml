@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jube>
+  <benchmark name="soma" outpath="${jube_benchmark_home}/../../run">
+    <fileset name="input">
+      <copy>../../src</copy>
+    </fileset>
+
+    <step name="fetch">
+      <use>input</use>
+      <do>
+        git clone --branch 0.7.0 https://gitlab.com/InnocentBug/SOMA.git soma
+      </do>
+    </step>
+
+    <step name="compile" depend="fetch">
+      <do> module purge </do>
+      <do> module load Stages/2023 </do>
+      <do> module load NVHPC </do>
+      <do> module load Doxygen </do>
+      <do> module load ParaStationMPI </do>
+      <do> module load HDF5 </do>
+      <do> module load CMake </do>
+      <do> module load NCCL </do>
+      <do> module load Python </do>
+      <do> export CC=nvc </do>
+      <do> cmake -B build -S fetch/soma -DINSTALL_PYTHON=ON </do>
+      <do> cmake --build build </do>
+      <do> cmake --install build --prefix install </do>
+    </step>
+
+    <step name="prepare" depend="compile">
+      <use> input </use>
+      <do> module purge </do>
+      <do> module load Stages/2023 </do>
+      <do> module load GCC </do>
+      <do> module load Python </do>
+      <do> module load h5py </do>
+      <do> cp -r compile/install install </do>
+      <do> python compile/install/python-script/ConfGen.py -i src/coord.xml </do>
+      <do> ls </do>
+    </step>
+
+    <parameterset name="systemParameter" init_with="platform.xml">
+      <parameter name="nodes">
+        8
+      </parameter>
+      <parameter name="taskspernode" type="int">
+        4
+      </parameter>
+      <parameter name="timelimit">
+        00:30:00
+      </parameter>
+      <parameter name="queue">
+        booster
+      </parameter>
+      <parameter name="account">
+        jscbenchmark
+      </parameter>
+      <parameter name="gres">
+        gpu:${taskspernode}
+      </parameter>
+      <parameter name="executable">
+        prepare/install/bin/SOMA
+      </parameter>
+      <parameter name="args_exec">
+        --coord-file prepare/src/coord.h5 --timesteps 20000 --gpus 1 --final-file /dev/null --rng-seed 2167612478
+      </parameter>
+      <parameter name="preprocess">
+        date +'start_time: %s' > time.out
+        module purge
+        module load Stages/2023
+        module load NVHPC
+        module load ParaStationMPI
+        module load HDF5
+      </parameter>
+      <parameter name="postprocess">
+        date +'stop_time: %s' >> time.out
+      </parameter>
+    </parameterset>
+
+    <parameterset name="executeset" init_with="platform.xml">
+    </parameterset>
+
+    <step name="run" depend="prepare">
+      <use from="platform.xml">executeset</use>
+      <use>systemParameter</use>
+      <use from="platform.xml">jobfiles</use>
+      <use from="platform.xml">executesub</use>
+      <do>
+        ${submit} --parsable ${submit_script} > run.jobid
+      </do>
+    </step>
+
+    <step name="wait" depend="run">
+      <use> input </use>
+      <do>
+        WAIT_JOB_ID=$(cat run/run.jobid)
+        src/wait --jobid $WAIT_JOB_ID
+      </do>
+    </step>
+
+    <patternset name="timing_pattern">
+      <pattern name="tps" type="float">
+        TPS $jube_pat_fp
+      </pattern>
+      <pattern unit="secs" name="effective_runtime" type="float" mode="python">
+        20000 / ${tps}
+      </pattern>
+    </patternset>
+
+    <analyser name="timing_analyzer" reduce="false">
+      <use>timing_pattern</use>
+      <analyse step="run">
+        <file>
+          job.out
+        </file>
+      </analyse>
+    </analyser>
+
+    <result>
+      <use>timing_analyzer</use>
+      <table name="stats" style="csv" sort="nodes,taskspernode">
+        <column>nodes</column>
+        <column>taskspernode</column>
+        <column>tps</column>
+        <column>effective_runtime</column>
+      </table>
+    </result>
+
+  </benchmark>
+</jube>

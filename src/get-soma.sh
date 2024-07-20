@@ -1,0 +1,1 @@
+git clone --branch 0.7.0 https://gitlab.com/InnocentBug/SOMA.git soma
