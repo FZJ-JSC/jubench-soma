@@ -14,7 +14,7 @@
 
     <step name="compile" depend="fetch">
       <do> module purge </do>
-      <do> module load Stages/2023 </do>
+      <do> module load Stages/2024 </do>
       <do> module load NVHPC </do>
       <do> module load Doxygen </do>
       <do> module load ParaStationMPI </do>
@@ -31,7 +31,7 @@
     <step name="prepare" depend="compile">
       <use> input </use>
       <do> module purge </do>
-      <do> module load Stages/2023 </do>
+      <do> module load Stages/2024 </do>
       <do> module load GCC </do>
       <do> module load Python </do>
       <do> module load h5py </do>
@@ -68,7 +68,7 @@
       <parameter name="preprocess">
         date +'start_time: %s' > time.out
         module purge
-        module load Stages/2023
+        module load Stages/2024
         module load NVHPC
         module load ParaStationMPI
         module load HDF5
